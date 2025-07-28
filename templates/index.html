@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lung Cancer + Mental Health App</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 0; }
+    .container { display: flex; flex-direction: row; height: 100vh; }
+    .left-panel, .right-panel { padding: 20px; box-sizing: border-box; }
+    .left-panel { width: 40%; background: #fff; box-shadow: 2px 0 10px rgba(0,0,0,0.05); overflow-y: auto; }
+    .right-panel { width: 60%; background: #fefefe; }
+    h2, h4 { margin-top: 0; }
+    input[type="file"] { margin-bottom: 10px; }
+    #histology-result, #xray-result { font-weight: bold; margin-top: 10px; }
+    .chat-container { max-width: 100%; margin: 0 auto; padding: 10px; border-radius: 12px; }
+    .chat-box { max-height: 400px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #ddd; padding: 10px; border-radius: 8px; background: #fafafa; }
+    .message { margin: 10px 0; padding: 10px 15px; border-radius: 20px; max-width: 80%; clear: both; }
+    .user { background: #d1e7ff; float: right; text-align: right; }
+    .bot { background: #e0ffe0; float: left; text-align: left; }
+    .app-title {
+  text-align: center;
+  font-weight: bold;
+  font-size: 40px;
+  color: #007bff; /* Blue color */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 20px;
+  background: linear-gradient(to right, #e0f7fa, #f1f8e9);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  margin: 20px auto;
+  width: fit-content;
+}
+
+    .input-row { display: flex; gap: 10px; }
+    input[type="text"] { flex: 1; padding: 10px; font-size: 16px; }
+    button { background-color: #007bff; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
+    button:hover { background-color: #0056b3; }
+    audio { display: none; }
+    .prediction-card { background: #fdfdfd; border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1 class="app-title">LungCare</h1>
+  <div class="container">
+    <div class="left-panel">
+      <h2>Lung Cancer Prediction</h2>
+      <div class="prediction-card">
+        <h4>🩺 Histopathology Image Prediction</h4>
+        <p>Upload a histopathology image.</p>
+        <form id="predictFormHistology" enctype="multipart/form-data">
+          <input type="file" id="imageHistology" name="image" accept="image/*" required />
+          <button type="submit">🔍 Predict</button>
+        </form>
+        <div id="histology-result" style="display: none;">
+          <p id="histology-result-text"></p>
+          <p id="histology-explanation-text"></p>
+        </div>
+      </div>
+
+      <div class="prediction-card">
+        <h4>🩻 X-ray Image Prediction</h4>
+        <p>Upload a chest X-ray image.</p>
+        <form id="predictFormXray" enctype="multipart/form-data">
+          <input type="file" id="imageXray" name="xray" accept="image/*" required />
+          <button type="submit">🔬 Analyze</button>
+        </form>
+        <div id="xray-result" style="display: none;">
+          <p id="xray-result-text"></p>
+          <p id="xray-explanation-text"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="chat-container">
+        <h2>🧠 Mental Health Chatbot</h2>
+        <div class="chat-box" id="chatBox"></div>
+        <div class="input-row">
+          <input type="text" id="textInput" placeholder="Type your message..." />
+          <button onclick="sendMessage()">Send</button>
+          <button onclick="startRecording()">🎤</button>
+        </div>
+        <audio id="botAudio" autoplay></audio>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ JS globally accessible -->
+  <script>
+    async function sendMessage(text = null) {
+      const chatBox = document.getElementById('chatBox');
+      const textInput = document.getElementById('textInput');
+      const botAudio = document.getElementById('botAudio');
+
+      const userMessage = text || textInput.value;
+      if (!userMessage) return;
+
+      appendMessage(userMessage, 'user');
+      textInput.value = '';
+
+      const res = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMessage })
+      });
+
+      const data = await res.json();
+      appendMessage(data.response || "Bot failed to reply", 'bot');
+
+      if (data.audio) {
+        botAudio.src = data.audio;
+        botAudio.play();
+      }
+    }
+
+    function appendMessage(message, sender) {
+      const chatBox = document.getElementById('chatBox');
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `message ${sender}`;
+      msgDiv.innerText = message;
+      chatBox.appendChild(msgDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function startRecording() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("Voice recognition not supported. Try using Chrome desktop.");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.start();
+
+      recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        sendMessage(transcript);
+      };
+
+      recognition.onerror = function(event) {
+        console.error("Voice input error:", event.error);
+        alert("Voice input error: " + event.error);
+      };
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      const textInput = document.getElementById("textInput");
+
+      textInput.addEventListener("keydown", function(event) {
+        if (event.key === "Enter") sendMessage();
+      });
+
+      // Histopathology Prediction
+      const histologyForm = document.getElementById("predictFormHistology");
+      histologyForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(histologyForm);
+        const res = await fetch("/predict", {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+
+        const resultText = document.getElementById("histology-result-text");
+        const explanationText = document.getElementById("histology-explanation-text");
+        const resultDiv = document.getElementById("histology-result");
+
+        resultText.innerText = data.prediction === "Cancerous" ? "🧬 Result: Cancerous" : "✅ Result: Non-Cancerous";
+        resultText.style.color = data.prediction === "Cancerous" ? "red" : "green";
+        explanationText.innerText = data.prediction === "Cancerous"
+          ? "This tissue appears cancerous. Please consult a specialist."
+          : "This tissue appears healthy.";
+        resultDiv.style.display = "block";
+      });
+
+      // X-ray Prediction
+      const xrayForm = document.getElementById("predictFormXray");
+      xrayForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(xrayForm);
+        const res = await fetch("/predict_xray", {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await res.json();
+        const resultText = document.getElementById("xray-result-text");
+        const explanationText = document.getElementById("xray-explanation-text");
+        const resultDiv = document.getElementById("xray-result");
+
+        resultText.innerText = data.prediction === "Cancerous" ? "🩻 Result: Cancerous" : "✅ Result: Non-Cancerous";
+        resultText.style.color = data.prediction === "Cancerous" ? "red" : "green";
+        explanationText.innerText = data.prediction === "Cancerous"
+          ? "Possible lung cancer signs detected. Consult a radiologist."
+          : "No signs of cancer detected in X-ray.";
+        resultDiv.style.display = "block";
+      });
+    });
+  </script>
+</body>
+</html>
